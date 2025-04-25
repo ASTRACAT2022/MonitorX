@@ -76,7 +76,7 @@ async def send_telegram_message(message):
 # Проверка пинга
 def check_ping(host):
     try:
-        response_time = ping(host, timeout= personally 2)
+        response_time = ping(host, timeout=2)  # Исправлена ошибка
         if response_time is None:
             return False, None
         return True, response_time
@@ -208,7 +208,7 @@ def graph_data():
     data = {}
     for service in services:
         logs = MonitoringLog.query.filter(
-            MonitoringLog.service_id == service.id,
+            MonitoringLog.service_id = service.id,
             MonitoringLog.timestamp >= start_time
         ).all()
         data[service.name] = {
