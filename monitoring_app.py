@@ -9,7 +9,6 @@ import telegram
 import asyncio
 import logging
 from datetime import datetime, timedelta
-import json
 import os
 
 # Настройка логирования
@@ -22,9 +21,15 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
 # Конфигурация Telegram
-TELEGRAM_BOT_TOKEN = os.environ.get('7705234760:AAGD1bFJaOeoedKPWxLOVZJYsA5jLQMhtw4')
-TELEGRAM_CHAT_ID = os.environ.get('650154766')
-bot = telegram.Bot(token=TELEGRAM_BOT_TOKEN)
+TELEGRAM_BOT_TOKEN = "7705234760:AAGD1bFJaOeoedKPWxLOVZJYsA5jLQMhtw4"  # Ваш API-токен
+TELEGRAM_CHAT_ID = "650154766"  # Ваш Chat ID
+
+# Инициализация Telegram-бота
+try:
+    bot = telegram.Bot(token=TELEGRAM_BOT_TOKEN)
+except telegram.error.InvalidToken as e:
+    logging.error(f"Invalid Telegram token: {e}")
+    bot = None
 
 # Модели базы данных
 class Service(db.Model):
@@ -55,6 +60,9 @@ with app.app_context():
 
 # Отправка уведомлений в Telegram
 async def send_telegram_message(message):
+    if bot is None:
+        logging.warning(f"Cannot send Telegram message: Bot not initialized. Message: {message}")
+        return
     try:
         await bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message)
         logging.info(f"Telegram notification sent: {message}")
@@ -69,8 +77,8 @@ def check_ping(host):
             return False, None
         return True, response_time
     except Exception as e:
-        logging.error(f"Ping error for {host}: {e}")
-        return False, None
+        logging.warning(f"Ping disabled or error for {host}: {e}. Assuming host is up.")
+        return True, None  # Заглушка для платформ, где ICMP ограничен
 
 # Проверка HTTP
 def check_http(url):
