@@ -17,13 +17,13 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 # Инициализация Flask
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///monitoring.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////app/monitoring.db'  # Явный путь для Render
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
 # Конфигурация Telegram
-TELEGRAM_BOT_TOKEN = "7705234760:AAGD1bFJaOeoedKPWxLOVZJYsA5jLQMhtw4"  # Замените на ваш токен
-TELEGRAM_CHAT_ID = "650154766"      # Замените на ваш чат ID
+TELEGRAM_BOT_TOKEN = os.environ.get('7705234760:AAGD1bFJaOeoedKPWxLOVZJYsA5jLQMhtw4')
+TELEGRAM_CHAT_ID = os.environ.get('650154766')
 bot = telegram.Bot(token=TELEGRAM_BOT_TOKEN)
 
 # Модели базы данных
@@ -96,23 +96,23 @@ def monitor_services():
             # Проверка пинга
             ping_success, ping_time = check_ping(service.ping_host)
             if not ping_success:
-                incident = f"Ping failed for {service.name}"
+                incident = f"Пинг не удался для {service.name}"
                 asyncio.run(send_telegram_message(incident))
 
             # Проверка HTTP
             status_code, response_time = check_http(service.url)
             if status_code:
                 if response_time > settings.latency_threshold:
-                    incident = f"High latency for {service.name}: {response_time}s"
+                    incident = f"Высокая задержка для {service.name}: {response_time}с"
                     asyncio.run(send_telegram_message(incident))
                 if status_code >= 500:
-                    incident = f"Server error for {service.name}: Status {status_code}"
+                    incident = f"Ошибка сервера для {service.name}: Статус {status_code}"
                     asyncio.run(send_telegram_message(incident))
                 elif status_code >= 400:
-                    incident = f"Client error for {service.name}: Status {status_code}"
+                    incident = f"Ошибка клиента для {service.name}: Статус {status_code}"
                     asyncio.run(send_telegram_message(incident))
             else:
-                incident = f"HTTP request failed for {service.name}"
+                incident = f"HTTP-запрос не удался для {service.name}"
                 asyncio.run(send_telegram_message(incident))
 
             # Сохранение логов
@@ -209,4 +209,5 @@ def graph_data():
     return jsonify(data)
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)
