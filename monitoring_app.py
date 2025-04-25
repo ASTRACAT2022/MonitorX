@@ -16,7 +16,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 # Инициализация Flask
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////tmp/monitoring.db'  # Изменен путь на /tmp
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////tmp/monitoring.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
@@ -50,9 +50,9 @@ class MonitoringLog(db.Model):
 
 class Settings(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    check_interval = db.Column(db.Integer, default=300)  # Интервал в секундах
-    latency_threshold = db.Column(db.Float, default=1.0)  # Порог задержки в секундах
-    error_threshold = db.Column(db.Integer, default=1)   # Порог ошибок
+    check_interval = db.Column(db.Integer, default=300)
+    latency_threshold = db.Column(db.Float, default=1.0)
+    error_threshold = db.Column(db.Integer, default=1)
 
 # Инициализация базы данных
 with app.app_context():
@@ -76,13 +76,13 @@ async def send_telegram_message(message):
 # Проверка пинга
 def check_ping(host):
     try:
-        response_time = ping(host, timeout=2)
+        response_time = ping(host, timeout= personally 2)
         if response_time is None:
             return False, None
         return True, response_time
     except Exception as e:
         logging.warning(f"Ping disabled or error for {host}: {e}. Assuming host is up.")
-        return True, None  # Заглушка для платформ, где ICMP ограничен
+        return True, None
 
 # Проверка HTTP
 def check_http(url):
@@ -105,13 +105,11 @@ def monitor_services():
         services = Service.query.all()
         for service in services:
             incident = None
-            # Проверка пинга
             ping_success, ping_time = check_ping(service.ping_host)
             if not ping_success:
                 incident = f"Пинг не удался для {service.name}"
                 asyncio.run(send_telegram_message(incident))
 
-            # Проверка HTTP
             status_code, response_time = check_http(service.url)
             if status_code:
                 if response_time > settings.latency_threshold:
@@ -127,7 +125,6 @@ def monitor_services():
                 incident = f"HTTP-запрос не удался для {service.name}"
                 asyncio.run(send_telegram_message(incident))
 
-            # Сохранение логов
             log = MonitoringLog(
                 service_id=service.id,
                 ping_success=ping_success,
@@ -219,6 +216,32 @@ def graph_data():
             'response_times': [log.response_time if log.response_time else 0 for log in logs]
         }
     return jsonify(data)
+
+@app.route('/status')
+def status():
+    services = Service.query.all()
+    if not services:
+        return jsonify({'status': 'Нет сервисов для мониторинга', 'class': 'bg-gray-500'})
+    
+    latest_logs = []
+    for service in services:
+        log = MonitoringLog.query.filter_by(service_id=service.id).order_by(MonitoringLog.timestamp.desc()).first()
+        latest_logs.append(log)
+    
+    available_count = sum(1 for log in latest_logs if log and log.http_status and 200 <= log.http_status < 400)
+    total_count = len(latest_logs)
+    
+    if available_count == total_count:
+        status = 'Все сервисы доступны'
+        status_class = 'bg-green-500'
+    elif available_count > 0:
+        status = 'Частичная доступность'
+        status_class = 'bg-yellow-500'
+    else:
+        status = 'Отказ всех сервисов'
+        status_class = 'bg-red-500'
+    
+    return jsonify({'status': status, 'class': status_class})
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
