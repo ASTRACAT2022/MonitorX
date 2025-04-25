@@ -4,6 +4,7 @@ import re
 import random
 import os
 import gc
+import logging
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 from transformers import pipeline
@@ -12,9 +13,15 @@ import threading
 from datetime import datetime, timedelta
 from uuid import uuid4
 
+# Настройка логирования
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
 # Инициализация
-TOKEN = os.getenv('TELEGRAM_TOKEN', 'YOUR_BOT_TOKEN')
-classifier = pipeline('text-classification', model='google/mobilebert-uncased', device=-1)
+TOKEN = '7705234760:AAGD1bFJaOeoedKPWxLOVZJYsA5jLQMhtw4'
+try:
+    classifier = pipeline('text-classification', model='google/mobilebert-uncased', device=-1)
+except Exception as e:
+    logging.error(f"Ошибка инициализации MobileBERT: {e}")
 app = Flask(__name__)
 
 # База данных
@@ -26,7 +33,7 @@ cursor.execute('''CREATE TABLE IF NOT EXISTS settings (
                     sensitivity REAL DEFAULT 0.7,
                     welcome_enabled INTEGER DEFAULT 1,
                     captcha_enabled INTEGER DEFAULT 1,
-                    captcha_timeout INTEGER DEFAULT 120,
+                    captcha_timeout INTEGER DEFAULT 60,
                     captcha_type TEXT DEFAULT 'button',
                     spam_keywords TEXT)''')
 cursor.execute('''CREATE TABLE IF NOT EXISTS captcha (
@@ -52,12 +59,16 @@ def is_spam(text, chat_id):
     for keyword in keywords:
         if keyword.strip() and re.search(keyword.lower(), text.lower()):
             return True
-    result = classifier(text)[0]
-    score = result['score'] if result['label'] == 'NEGATIVE' else 1 - result['score']
-    cursor.execute('SELECT sensitivity FROM settings WHERE chat_id = ?', (chat_id,))
-    sensitivity = cursor.fetchone()
-    sensitivity = sensitivity[0] if sensitivity else 0.7
-    return score > sensitivity
+    try:
+        result = classifier(text)[0]
+        score = result['score'] if result['label'] == 'NEGATIVE' else 1 - result['score']
+        cursor.execute('SELECT sensitivity FROM settings WHERE chat_id = ?', (chat_id,))
+        sensitivity = cursor.fetchone()
+        sensitivity = sensitivity[0] if sensitivity else 0.7
+        return score > sensitivity
+    except Exception as e:
+        logging.error(f"Ошибка классификации спама: {e}")
+        return False
 
 # Генерация вопроса для CAPTCHA
 def generate_captcha_question():
@@ -71,13 +82,13 @@ def generate_captcha_question():
 async def send_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     user = update.effective_user
-    if update.effective_chat.type != 'group' and update.effective_chat.type != 'supergroup':
-        return  # CAPTCHA только для групп
+    if update.effective_chat.type not in ['group', 'supergroup']:
+        return
     cursor.execute('SELECT welcome_enabled, captcha_enabled, captcha_timeout, captcha_type FROM settings WHERE chat_id = ?', (chat_id,))
     settings = cursor.fetchone()
     welcome_enabled = settings[0] if settings else 1
     captcha_enabled = settings[1] if settings else 1
-    captcha_timeout = settings[2] if settings else 120
+    captcha_timeout = settings[2] if settings else 60
     captcha_type = settings[3] if settings else 'button'
     welcome = f"Добро пожаловать, {user.first_name}!"
 
@@ -109,7 +120,7 @@ async def check_captcha_timeout(context: ContextTypes.DEFAULT_TYPE):
             cursor.execute('DELETE FROM captcha WHERE chat_id = ? AND user_id = ?', (chat_id, user_id))
             conn.commit()
         except Exception as e:
-            print(f"Ошибка при бане: {e}")
+            logging.error(f"Ошибка при бане: {e}")
 
 # Обработчик новых участников (только для групп)
 async def new_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -152,7 +163,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_message(chat_id, f"Сообщение от {username} удалено как спам.")
         else:  # Личный чат
             await update.message.reply_text("Это сообщение похоже на спам.")
-        gc.collect()  # Очистка памяти
+        gc.collect()
     else:
         if chat_type == 'private':
             await update.message.reply_text("Отправьте /start для управления ботом.")
@@ -314,7 +325,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         cursor.execute('SELECT captcha_enabled, captcha_timeout, captcha_type FROM settings WHERE chat_id = ?', (chat_id,))
         settings = cursor.fetchone()
-        captcha_enabled, captcha_timeout, captcha_type = settings if settings else (1, 120, 'button')
+        captcha_enabled, captcha_timeout, captcha_type = settings if settings else (1, 60, 'button')
         markup = InlineKeyboardMarkup([
             [InlineKeyboardButton(f"CAPTCHA: {'Вкл' if captcha_enabled else 'Выкл'}", callback_data='toggle_captcha')],
             [InlineKeyboardButton("Увеличить тайм-аут", callback_data='increase_captcha_timeout'),
@@ -330,13 +341,13 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         cursor.execute('SELECT captcha_type FROM settings WHERE chat_id = ?', (chat_id,))
         captcha_type = cursor.fetchone()
-        captcha_type = captcha_type[0] if captcha_type else 'button'
+        captcha_type = cursor.fetchone()[0] if cursor.fetchone() else 'button'
         new_type = 'question' if captcha_type == 'button' else 'button'
         cursor.execute('INSERT OR REPLACE INTO settings (chat_id, captcha_type) VALUES (?, ?)', (chat_id, new_type))
         conn.commit()
         cursor.execute('SELECT captcha_enabled, captcha_timeout, captcha_type FROM settings WHERE chat_id = ?', (chat_id,))
         settings = cursor.fetchone()
-        captcha_enabled, captcha_timeout, captcha_type = settings if settings else (1, 120, new_type)
+        captcha_enabled, captcha_timeout, captcha_type = settings if settings else (1, 60, new_type)
         markup = InlineKeyboardMarkup([
             [InlineKeyboardButton(f"CAPTCHA: {'Вкл' if captcha_enabled else 'Выкл'}", callback_data='toggle_captcha')],
             [InlineKeyboardButton("Увеличить тайм-аут", callback_data='increase_captcha_timeout'),
@@ -352,7 +363,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         cursor.execute('SELECT captcha_timeout FROM settings WHERE chat_id = ?', (chat_id,))
         timeout = cursor.fetchone()
-        timeout = timeout[0] if timeout else 120
+        timeout = timeout[0] if timeout else 60
         if data == 'increase_captcha_timeout':
             timeout += 30
         else:
