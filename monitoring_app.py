@@ -22,8 +22,8 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
 # Конфигурация Telegram
-TELEGRAM_BOT_TOKEN = "YOUR_BOT_TOKEN"  # Замените на ваш токен
-TELEGRAM_CHAT_ID = "YOUR_CHAT_ID"      # Замените на ваш чат ID
+TELEGRAM_BOT_TOKEN = "7705234760:AAGD1bFJaOeoedKPWxLOVZJYsA5jLQMhtw4"  # Замените на ваш токен
+TELEGRAM_CHAT_ID = "650154766"      # Замените на ваш чат ID
 bot = telegram.Bot(token=TELEGRAM_BOT_TOKEN)
 
 # Модели базы данных
