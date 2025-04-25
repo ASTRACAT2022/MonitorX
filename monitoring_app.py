@@ -16,13 +16,13 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 # Инициализация Flask
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////app/monitoring.db'  # Явный путь для Render
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////tmp/monitoring.db'  # Изменен путь на /tmp
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
 # Конфигурация Telegram
-TELEGRAM_BOT_TOKEN = "7705234760:AAGD1bFJaOeoedKPWxLOVZJYsA5jLQMhtw4"  # Ваш API-токен
-TELEGRAM_CHAT_ID = "650154766"  # Ваш Chat ID
+TELEGRAM_BOT_TOKEN = "7705234760:AAGD1bFJaOeoedKPWxLOVZJYsA5jLQMhtw4"
+TELEGRAM_CHAT_ID = "650154766"
 
 # Инициализация Telegram-бота
 try:
@@ -56,7 +56,11 @@ class Settings(db.Model):
 
 # Инициализация базы данных
 with app.app_context():
-    db.create_all()
+    try:
+        db.create_all()
+        logging.info("Database initialized successfully")
+    except Exception as e:
+        logging.error(f"Failed to initialize database: {e}")
 
 # Отправка уведомлений в Telegram
 async def send_telegram_message(message):
