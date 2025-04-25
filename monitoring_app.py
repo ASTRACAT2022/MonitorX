@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 from uuid import uuid4
 
 # Инициализация
-TOKEN = 'YOUR_BOT_TOKEN'  # Замените на ваш токен (например, 7705234760:AAGD1bFJaOeoedKPWxLOVZJYsA5jLQMhtw4)
+TOKEN = '7705234760:AAGD1bFJaOeoedKPWxLOVZJYsA5jLQMhtw4'  # Замените на ваш токен (например, 7705234760:AAGD1bFJaOeoedKPWxLOVZJYsA5jLQMhtw4)
 classifier = pipeline('text-classification', model='distilbert-base-uncased-finetuned-sst-2-english')
 
 # База данных
