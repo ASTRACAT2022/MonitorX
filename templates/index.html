@@ -149,8 +149,8 @@
                     document.getElementById('status-text').className = 'text-2xl font-semibold bg-red-500';
                 });
         }
-        updateStatus(); // Загрузка состояния при открытии страницы
-        setInterval(updateStatus, 60000); // Обновление каждые 60 секунд
+        updateStatus();
+        setInterval(updateStatus, 60000);
 
         // Загрузка статистики
         fetch('/stats')
