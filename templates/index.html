@@ -3,11 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MonitorX</title>
+    <title>MonitorX by astracat</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        /* Кастомные стили для glassmorphism */
         .glass {
             background: rgba(255, 255, 255, 0.05);
             backdrop-filter: blur(10px);
@@ -20,7 +19,6 @@
         .hover-scale:hover {
             transform: scale(1.02);
         }
-        /* Стили для Chart.js */
         canvas {
             background: rgba(255, 255, 255, 0.05);
             border-radius: 8px;
@@ -30,9 +28,14 @@
 </head>
 <body class="bg-black text-white font-sans">
     <div class="container mx-auto p-6 max-w-7xl">
-        <h1 class="text-4xl font-bold mb-8 bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">
+        <h1 class="text-4xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">
             MonitorX by astracat
         </h1>
+
+        <!-- Индикатор состояния -->
+        <div class="mb-6 glass rounded-lg p-4 text-center">
+            <h2 id="status-text" class="text-2xl font-semibold">Проверка состояния...</h2>
+        </div>
 
         <!-- Форма для добавления сервиса -->
         <div class="mb-10 glass rounded-lg p-6 hover-scale">
@@ -131,6 +134,24 @@
     </div>
 
     <script>
+        // Загрузка состояния сервисов
+        function updateStatus() {
+            fetch('/status')
+                .then(response => response.json())
+                .then(data => {
+                    const statusElement = document.getElementById('status-text');
+                    statusElement.textContent = data.status;
+                    statusElement.className = `text-2xl font-semibold ${data.class}`;
+                })
+                .catch(error => {
+                    console.error('Error fetching status:', error);
+                    document.getElementById('status-text').textContent = 'Ошибка проверки состояния';
+                    document.getElementById('status-text').className = 'text-2xl font-semibold bg-red-500';
+                });
+        }
+        updateStatus(); // Загрузка состояния при открытии страницы
+        setInterval(updateStatus, 60000); // Обновление каждые 60 секунд
+
         // Загрузка статистики
         fetch('/stats')
             .then(response => response.json())
